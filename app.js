@@ -13,6 +13,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 let gridLayer = L.layerGroup().addTo(map);
 
+let claimedTiles = JSON.parse(localStorage.getItem("claimedTiles") || "{}");
+
+function tileKey(lat, lng) {
+  return lat.toFixed(5) + "_" + lng.toFixed(5);
+}
+
 async function generateGrid() {
   gridLayer.clearLayers();
 
@@ -57,11 +63,19 @@ async function generateGrid() {
 
       const distToPlayer = distance(center, { lat: playerPosition[0], lon: playerPosition[1] });
 
+      if (distToPlayer < 5) {
+        const key = tileKey(lat, lng);
+        claimedTiles[key] = true;
+      }
+
       // hard cap: don't generate beyond 500m
       if (distToPlayer > maxRadius) continue;
 
       // only render within 200m
       if (distToPlayer > activeRadius) continue;
+
+      const key = tileKey(lat, lng);
+      const isClaimed = claimedTiles[key];
 
       const samplePoints = [
         center,
@@ -87,11 +101,17 @@ async function generateGrid() {
         [lat, lng + lngStep]
       ];
 
-      L.polygon(square, {
-        color: 'green',
+      const polygon = L.polygon(square, {
+        color: isClaimed ? 'red' : 'green',
         weight: 1,
-        fillOpacity: 0.3
+        fillOpacity: isClaimed ? 0.6 : 0.3
       }).addTo(gridLayer);
+
+      polygon.on('click', () => {
+        claimedTiles[key] = true;
+        localStorage.setItem("claimedTiles", JSON.stringify(claimedTiles));
+        generateGrid();
+      });
     }
   }
 }
