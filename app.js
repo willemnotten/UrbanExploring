@@ -39,8 +39,16 @@ async function generateGrid() {
 
       const center = [lat + latStep / 2, lng + lngStep / 2];
 
+      const samplePoints = [
+        center,
+        [lat, lng],
+        [lat + latStep, lng],
+        [lat, lng + lngStep],
+        [lat + latStep, lng + lngStep]
+      ];
+
       const isWater = waterPolygons.some(poly =>
-        pointInPolygon(center, poly)
+        samplePoints.some(p => pointInPolygon(p, poly))
       );
 
       if (isWater) continue;
@@ -89,7 +97,19 @@ async function fetchWaterData(bounds) {
 }
 
 function pointInPolygon(point, vs) {
+  if (!vs || vs.length < 3) return false;
+
   let x = point[0], y = point[1];
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < vs.length; i++) {
+    minX = Math.min(minX, vs[i].lat);
+    maxX = Math.max(maxX, vs[i].lat);
+    minY = Math.min(minY, vs[i].lon);
+    maxY = Math.max(maxY, vs[i].lon);
+  }
+  if (x < minX || x > maxX || y < minY || y > maxY) return false;
+
   let inside = false;
 
   for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
