@@ -8,6 +8,12 @@ navigator.geolocation.watchPosition(pos => {
   // Keep zoom stable, only update center
   map.setView(playerPosition, map.getZoom(), { animate: false });
 
+  if (!playerMarker) {
+    playerMarker = L.marker(playerPosition).addTo(map);
+  } else {
+    playerMarker.setLatLng(playerPosition);
+  }
+
   // regenerate game state on movement
   generateGrid();
 });
@@ -26,6 +32,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let gridLayer = L.layerGroup().addTo(map);
+let playerMarker = null;
+let enemyMarker = null;
 
 let claimedTiles = JSON.parse(localStorage.getItem("claimedTiles") || "{}");
 
@@ -39,6 +47,7 @@ function updateEnemyPosition() {
   const dx = (Math.random() - 0.5) * 0.002;
   const dy = (Math.random() - 0.5) * 0.002;
   enemyPosition = [enemyPosition[0] + dx, enemyPosition[1] + dy];
+  updateEnemyMarker();
 }
 
 setInterval(updateEnemyPosition, 4000);
@@ -169,6 +178,31 @@ async function generateGrid() {
         generateGrid();
       });
     }
+  }
+}
+
+function updateEnemyMarker() {
+  if (!enemyPosition) return;
+
+  const enemyLatLng = [enemyPosition[0], enemyPosition[1]];
+  const bounds = map.getBounds();
+
+  const isVisible = bounds.contains(enemyLatLng);
+
+  if (!isVisible) {
+    if (enemyMarker) {
+      map.removeLayer(enemyMarker);
+      enemyMarker = null;
+    }
+    return;
+  }
+
+  if (!enemyMarker) {
+    enemyMarker = L.marker(enemyLatLng, {
+      title: "Enemy"
+    }).addTo(map);
+  } else {
+    enemyMarker.setLatLng(enemyLatLng);
   }
 }
 
