@@ -4,8 +4,19 @@ let playerPosition = null;
 
 navigator.geolocation.watchPosition(pos => {
   playerPosition = [pos.coords.latitude, pos.coords.longitude];
-  map.setView(playerPosition, 17);
+
+  // Only recenter, don't force zoom
+  map.panTo(playerPosition);
 });
+
+// Enable map rotation based on device orientation (mobile only)
+if (window.DeviceOrientationEvent) {
+  window.addEventListener("deviceorientationabsolute", (event) => {
+    if (event.alpha != null) {
+      map.setBearing(event.alpha);
+    }
+  });
+}
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
@@ -63,9 +74,12 @@ async function generateGrid() {
 
       const distToPlayer = distance(center, { lat: playerPosition[0], lon: playerPosition[1] });
 
-      if (distToPlayer < 5) {
+      if (distToPlayer < 10) {
         const key = tileKey(lat, lng);
-        claimedTiles[key] = true;
+        if (!claimedTiles[key]) {
+          claimedTiles[key] = true;
+          localStorage.setItem("claimedTiles", JSON.stringify(claimedTiles));
+        }
       }
 
       // hard cap: don't generate beyond 500m
