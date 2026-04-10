@@ -5,8 +5,11 @@ let playerPosition = null;
 navigator.geolocation.watchPosition(pos => {
   playerPosition = [pos.coords.latitude, pos.coords.longitude];
 
-  // Only recenter, don't force zoom
-  map.panTo(playerPosition);
+  // Keep zoom stable, only update center
+  map.setView(playerPosition, map.getZoom(), { animate: false });
+
+  // regenerate game state on movement
+  generateGrid();
 });
 
 // Enable map rotation based on device orientation (mobile only)
@@ -41,7 +44,7 @@ async function generateGrid() {
   }
 
   const maxRadius = 100; // meters
-  const activeRadius = 50; // meters
+  const activeRadius = 200; // meters
 
   const centerLat = map.getCenter().lat;
 
