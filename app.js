@@ -1,5 +1,12 @@
 const map = L.map('map').setView([52.35, 5.22], 16);
 
+let playerPosition = null;
+
+navigator.geolocation.watchPosition(pos => {
+  playerPosition = [pos.coords.latitude, pos.coords.longitude];
+  map.setView(playerPosition, 17);
+});
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
 }).addTo(map);
@@ -10,10 +17,19 @@ async function generateGrid() {
   gridLayer.clearLayers();
 
   const bounds = map.getBounds();
+
+  if (!playerPosition) {
+    console.warn("No player position yet");
+    return;
+  }
+
+  const maxRadius = 500; // meters
+  const activeRadius = 200; // meters
+
   const centerLat = map.getCenter().lat;
 
-  const latStep = 50 / 111320;
-  const lngStep = 50 / (111320 * Math.cos(centerLat * Math.PI / 180));
+  const latStep = 10 / 111320;
+  const lngStep = 10 / (111320 * Math.cos(centerLat * Math.PI / 180));
 
   const waterData = await fetchWaterData(bounds);
   console.log("Water elements:", waterData.elements?.length);
@@ -38,6 +54,14 @@ async function generateGrid() {
     for (let lng = bounds.getWest(); lng < bounds.getEast(); lng += lngStep) {
 
       const center = [lat + latStep / 2, lng + lngStep / 2];
+
+      const distToPlayer = distance(center, { lat: playerPosition[0], lon: playerPosition[1] });
+
+      // hard cap: don't generate beyond 500m
+      if (distToPlayer > maxRadius) continue;
+
+      // only render within 200m
+      if (distToPlayer > activeRadius) continue;
 
       const samplePoints = [
         center,
