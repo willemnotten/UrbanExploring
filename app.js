@@ -29,6 +29,20 @@ let gridLayer = L.layerGroup().addTo(map);
 
 let claimedTiles = JSON.parse(localStorage.getItem("claimedTiles") || "{}");
 
+let enemyTiles = JSON.parse(localStorage.getItem("enemyTiles") || "{}");
+let discoveredTiles = JSON.parse(localStorage.getItem("discoveredTiles") || "{}");
+
+// simulate enemy player
+let enemyPosition = [52.36, 5.23];
+
+function updateEnemyPosition() {
+  const dx = (Math.random() - 0.5) * 0.002;
+  const dy = (Math.random() - 0.5) * 0.002;
+  enemyPosition = [enemyPosition[0] + dx, enemyPosition[1] + dy];
+}
+
+setInterval(updateEnemyPosition, 4000);
+
 function tileKey(lat, lng) {
   return lat.toFixed(5) + "_" + lng.toFixed(5);
 }
@@ -76,23 +90,46 @@ async function generateGrid() {
       const center = [lat + latStep / 2, lng + lngStep / 2];
 
       const distToPlayer = distance(center, { lat: playerPosition[0], lon: playerPosition[1] });
+      const distToEnemy = distance(center, { lat: enemyPosition[0], lon: enemyPosition[1] });
+      const key = tileKey(lat, lng);
+
+      // fog of war discovery
+      if (distToPlayer < activeRadius) {
+        discoveredTiles[key] = true;
+        localStorage.setItem("discoveredTiles", JSON.stringify(discoveredTiles));
+      }
 
       if (distToPlayer < 10) {
-        const key = tileKey(lat, lng);
         if (!claimedTiles[key]) {
           claimedTiles[key] = true;
           localStorage.setItem("claimedTiles", JSON.stringify(claimedTiles));
         }
       }
+      if (distToEnemy < 10) {
+        enemyTiles[key] = true;
+        localStorage.setItem("enemyTiles", JSON.stringify(enemyTiles));
+      }
 
       // hard cap: don't generate beyond 500m
       if (distToPlayer > maxRadius) continue;
 
-      // only render within 200m
-      if (distToPlayer > activeRadius) continue;
+      // fog of war: only render if discovered OR nearby
+      const isDiscovered = discoveredTiles[key];
+      if (!isDiscovered && distToPlayer > activeRadius) continue;
 
-      const key = tileKey(lat, lng);
-      const isClaimed = claimedTiles[key];
+      const isPlayerClaimed = claimedTiles[key];
+      const isEnemyClaimed = enemyTiles[key];
+
+      let color = 'green';
+      let fill = 0.3;
+
+      if (isEnemyClaimed) {
+        color = 'red';
+        fill = 0.6;
+      } else if (isPlayerClaimed) {
+        color = 'blue';
+        fill = 0.6;
+      }
 
       const samplePoints = [
         center,
@@ -119,14 +156,16 @@ async function generateGrid() {
       ];
 
       const polygon = L.polygon(square, {
-        color: isClaimed ? 'red' : 'green',
+        color,
         weight: 1,
-        fillOpacity: isClaimed ? 0.6 : 0.3
+        fillOpacity: fill
       }).addTo(gridLayer);
 
       polygon.on('click', () => {
         claimedTiles[key] = true;
+        enemyTiles[key] = false;
         localStorage.setItem("claimedTiles", JSON.stringify(claimedTiles));
+        localStorage.setItem("enemyTiles", JSON.stringify(enemyTiles));
         generateGrid();
       });
     }
