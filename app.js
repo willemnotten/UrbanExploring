@@ -16,8 +16,15 @@ async function generateGrid() {
   const lngStep = 50 / (111320 * Math.cos(centerLat * Math.PI / 180));
 
   const waterData = await fetchWaterData(bounds);
+  console.log("Water elements:", waterData.elements?.length);
 
   const roadsData = await fetchRoads(bounds);
+  console.log("Road elements:", roadsData.elements?.length);
+
+  if (!waterData.elements && !roadsData.elements) {
+    console.warn("No OSM data returned");
+    return;
+  }
 
   const roads = roadsData.elements
     .filter(el => el.geometry)
@@ -38,7 +45,7 @@ async function generateGrid() {
 
       if (isWater) continue;
 
-      const nearRoad = roads.some(p => distance(center, p) < 0.0003);
+      const nearRoad = roads.some(p => distance(center, p) < 40);
       if (!nearRoad) continue;
 
       const square = [
@@ -59,7 +66,7 @@ async function generateGrid() {
 
 async function fetchWaterData(bounds) {
   const query = `
-    [out:json];
+    [out:json][timeout:10];
     (
       way["natural"="water"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
       relation["natural"="water"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
@@ -67,12 +74,18 @@ async function fetchWaterData(bounds) {
     out geom;
   `;
 
-  const response = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: query
-  });
+  try {
+    const response = await fetch("https://overpass.kumi.systems/api/interpreter", {
+      method: "POST",
+      body: query
+    });
 
-  return response.json();
+    const text = await response.text();
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Water fetch failed", e);
+    return { elements: [] };
+  }
 }
 
 function pointInPolygon(point, vs) {
@@ -94,22 +107,28 @@ function pointInPolygon(point, vs) {
 
 async function fetchRoads(bounds) {
   const query = `
-    [out:json];
+    [out:json][timeout:10];
     way["highway"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
     out geom;
   `;
 
-  const res = await fetch("https://overpass-api.de/api/interpreter", {
-    method: "POST",
-    body: query
-  });
+  try {
+    const res = await fetch("https://overpass.kumi.systems/api/interpreter", {
+      method: "POST",
+      body: query
+    });
 
-  return res.json();
+    const text = await res.text();
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Road fetch failed", e);
+    return { elements: [] };
+  }
 }
 
 
 function distance(a, b) {
-  return Math.sqrt(
-    Math.pow(a[0] - b.lat, 2) + Math.pow(a[1] - b.lon, 2)
-  );
+  const dx = (a[1] - b.lon) * 111320 * Math.cos(a[0] * Math.PI / 180);
+  const dy = (a[0] - b.lat) * 111320;
+  return Math.sqrt(dx * dx + dy * dy);
 }
