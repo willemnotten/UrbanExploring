@@ -29,8 +29,8 @@ async function generateGrid() {
     return;
   }
 
-  const maxRadius = 500; // meters
-  const activeRadius = 100; // meters
+  const maxRadius = 100; // meters
+  const activeRadius = 50; // meters
 
   const centerLat = map.getCenter().lat;
 
